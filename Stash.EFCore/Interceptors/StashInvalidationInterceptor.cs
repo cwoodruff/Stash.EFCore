@@ -50,6 +50,7 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
 
     #region Sync overrides
 
+    /// <inheritdoc />
     public override InterceptionResult<int> SavingChanges(
         DbContextEventData eventData,
         InterceptionResult<int> result)
@@ -58,6 +59,7 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
         return result;
     }
 
+    /// <inheritdoc />
     public override int SavedChanges(
         SaveChangesCompletedEventData eventData,
         int result)
@@ -66,6 +68,7 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
         return result;
     }
 
+    /// <inheritdoc />
     public override void SaveChangesFailed(
         DbContextErrorEventData eventData)
     {
@@ -76,6 +79,7 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
 
     #region Async overrides
 
+    /// <inheritdoc />
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData,
         InterceptionResult<int> result,
@@ -85,6 +89,7 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
         return ValueTask.FromResult(result);
     }
 
+    /// <inheritdoc />
     public override async ValueTask<int> SavedChangesAsync(
         SaveChangesCompletedEventData eventData,
         int result,
@@ -94,6 +99,7 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
         return result;
     }
 
+    /// <inheritdoc />
     public override Task SaveChangesFailedAsync(
         DbContextErrorEventData eventData,
         CancellationToken cancellationToken = default)
