@@ -31,6 +31,11 @@ public class StashOptions
     public bool EnableLogging { get; set; } = true;
 
     /// <summary>
+    /// Maximum number of rows to cache per query. Queries returning more rows are not cached.
+    /// </summary>
+    public int MaxCachedRowsPerQuery { get; set; } = 10_000;
+
+    /// <summary>
     /// Named caching profiles for per-query configuration.
     /// </summary>
     public Dictionary<string, StashProfile> Profiles { get; set; } = new();

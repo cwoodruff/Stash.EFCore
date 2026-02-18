@@ -21,7 +21,9 @@ public class MemoryCacheStore : ICacheStore
         return Task.FromResult(result);
     }
 
-    public Task SetAsync(string key, CacheableResultSet value, TimeSpan absoluteExpiration, TimeSpan? slidingExpiration = null, CancellationToken cancellationToken = default)
+    public Task SetAsync(string key, CacheableResultSet value, TimeSpan absoluteExpiration,
+        TimeSpan? slidingExpiration = null, IReadOnlyCollection<string>? tags = null,
+        CancellationToken cancellationToken = default)
     {
         var options = new MemoryCacheEntryOptions
         {
@@ -38,7 +40,9 @@ public class MemoryCacheStore : ICacheStore
         });
 
         _cache.Set(key, value, options);
-        _tagIndex.Add(key, value.TableDependencies);
+
+        if (tags is { Count: > 0 })
+            _tagIndex.Add(key, tags);
 
         return Task.CompletedTask;
     }
@@ -89,6 +93,7 @@ public class MemoryCacheStore : ICacheStore
                         result.UnionWith(keys);
                 }
             }
+
             return result;
         }
 

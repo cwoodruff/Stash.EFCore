@@ -18,25 +18,23 @@ public class HybridCacheStore : ICacheStore
 
     public async Task<CacheableResultSet?> GetAsync(string key, CancellationToken cancellationToken = default)
     {
-        // HybridCache.GetOrCreateAsync requires a factory; use a sentinel approach
-        // to distinguish cache miss from cached null.
         var result = await _cache.GetOrCreateAsync(
             key,
-            cancellationToken => new ValueTask<CacheableResultSet?>(result: null),
+            ct => new ValueTask<CacheableResultSet?>(result: null),
             tags: null,
             cancellationToken: cancellationToken);
 
         return result;
     }
 
-    public async Task SetAsync(string key, CacheableResultSet value, TimeSpan absoluteExpiration, TimeSpan? slidingExpiration = null, CancellationToken cancellationToken = default)
+    public async Task SetAsync(string key, CacheableResultSet value, TimeSpan absoluteExpiration,
+        TimeSpan? slidingExpiration = null, IReadOnlyCollection<string>? tags = null,
+        CancellationToken cancellationToken = default)
     {
         var options = new HybridCacheEntryOptions
         {
             Expiration = absoluteExpiration
         };
-
-        var tags = value.TableDependencies;
 
         await _cache.SetAsync(key, value, options, tags, cancellationToken);
     }

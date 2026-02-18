@@ -62,24 +62,39 @@ public class StashCommandInterceptor : DbCommandInterceptor
         if (!ShouldCache(command))
             return result;
 
-        var cacheKey = _keyGenerator.GenerateKey(command);
-
-        // Check if this result was served from cache (already suppressed)
         if (result is CachedDataReader)
             return result;
 
+        var cacheKey = _keyGenerator.GenerateKey(command);
         var tableDependencies = TableDependencyParser.ExtractTableNames(command.CommandText);
-        var resultSet = await CacheableResultSet.FromDataReaderAsync(result, tableDependencies, cancellationToken);
 
-        await _cacheStore.SetAsync(
-            cacheKey,
-            resultSet,
-            _options.DefaultAbsoluteExpiration,
-            _options.DefaultSlidingExpiration,
-            cancellationToken);
+        // Use int.MaxValue so CaptureAsync always returns the full result set.
+        // The maxRows check is applied afterward to decide whether to cache.
+        var resultSet = await CacheableResultSet.CaptureAsync(result, int.MaxValue, cancellationToken);
 
-        _logger.LogDebug(StashEventIds.CacheStore, "Stored {RowCount} rows for key {CacheKey} with dependencies [{Tables}]",
-            resultSet.Rows.Count, cacheKey, string.Join(", ", tableDependencies));
+        if (resultSet is null)
+            return new CachedDataReader(new CacheableResultSet());
+
+        if (resultSet.Rows.Length <= _options.MaxCachedRowsPerQuery)
+        {
+            await _cacheStore.SetAsync(
+                cacheKey,
+                resultSet,
+                _options.DefaultAbsoluteExpiration,
+                _options.DefaultSlidingExpiration,
+                tableDependencies,
+                cancellationToken);
+
+            _logger.LogDebug(StashEventIds.CacheStore,
+                "Stored {RowCount} rows for key {CacheKey} with dependencies [{Tables}]",
+                resultSet.Rows.Length, cacheKey, string.Join(", ", tableDependencies));
+        }
+        else
+        {
+            _logger.LogDebug(StashEventIds.CacheMiss,
+                "Skipping cache for key {CacheKey}: {RowCount} rows exceeds limit of {MaxRows}",
+                cacheKey, resultSet.Rows.Length, _options.MaxCachedRowsPerQuery);
+        }
 
         return new CachedDataReader(resultSet);
     }
@@ -89,7 +104,6 @@ public class StashCommandInterceptor : DbCommandInterceptor
         if (_options.EnableGlobalCaching)
             return true;
 
-        // Check for .Stash() tag marker in the command text
         return command.CommandText.Contains(Extensions.QueryableExtensions.StashTag, StringComparison.Ordinal);
     }
 }

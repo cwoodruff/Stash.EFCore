@@ -24,19 +24,19 @@ public class MemoryCacheStoreTests
     [Fact]
     public async Task SetAsync_ThenGetAsync_ReturnsCachedValue()
     {
-        var resultSet = CreateSampleResultSet("Products");
-        await _store.SetAsync("key1", resultSet, TimeSpan.FromMinutes(5));
+        var resultSet = CreateSampleResultSet();
+        await _store.SetAsync("key1", resultSet, TimeSpan.FromMinutes(5), tags: ["Products"]);
 
         var cached = await _store.GetAsync("key1");
         cached.Should().NotBeNull();
-        cached!.Rows.Should().HaveCount(resultSet.Rows.Count);
+        cached!.Rows.Should().HaveCount(resultSet.Rows.Length);
     }
 
     [Fact]
     public async Task InvalidateByTagsAsync_RemovesMatchingEntries()
     {
-        var resultSet = CreateSampleResultSet("Products");
-        await _store.SetAsync("key1", resultSet, TimeSpan.FromMinutes(5));
+        var resultSet = CreateSampleResultSet();
+        await _store.SetAsync("key1", resultSet, TimeSpan.FromMinutes(5), tags: ["Products"]);
 
         await _store.InvalidateByTagsAsync(["Products"]);
 
@@ -44,13 +44,13 @@ public class MemoryCacheStoreTests
         cached.Should().BeNull();
     }
 
-    private static CacheableResultSet CreateSampleResultSet(params string[] tableDependencies)
+    private static CacheableResultSet CreateSampleResultSet()
     {
         return new CacheableResultSet
         {
             Columns =
             [
-                new CacheableResultSet.ColumnInfo
+                new ColumnDefinition
                 {
                     Name = "Id",
                     DataTypeName = "integer",
@@ -58,8 +58,7 @@ public class MemoryCacheStoreTests
                     Ordinal = 0
                 }
             ],
-            Rows = [new object?[] { 1 }, new object?[] { 2 }],
-            TableDependencies = tableDependencies
+            Rows = [new object?[] { 1 }, new object?[] { 2 }]
         };
     }
 }

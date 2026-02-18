@@ -13,7 +13,9 @@ public interface ICacheStore
     /// <summary>
     /// Stores a result set in the cache with the specified expiration and table dependency tags.
     /// </summary>
-    Task SetAsync(string key, CacheableResultSet value, TimeSpan absoluteExpiration, TimeSpan? slidingExpiration = null, CancellationToken cancellationToken = default);
+    Task SetAsync(string key, CacheableResultSet value, TimeSpan absoluteExpiration,
+        TimeSpan? slidingExpiration = null, IReadOnlyCollection<string>? tags = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Invalidates all cache entries tagged with any of the specified table names.
