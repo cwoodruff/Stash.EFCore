@@ -18,6 +18,12 @@ public class StashHealthCheck : IHealthCheck
     private readonly IStashStatistics _statistics;
     private readonly StashOptions _options;
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="StashHealthCheck"/>.
+    /// </summary>
+    /// <param name="cacheStore">The cache store to probe for connectivity.</param>
+    /// <param name="statistics">Statistics tracker for hit rate evaluation.</param>
+    /// <param name="options">Options containing the <see cref="StashOptions.MinimumHitRatePercent"/> threshold.</param>
     public StashHealthCheck(ICacheStore cacheStore, IStashStatistics statistics, StashOptions options)
     {
         _cacheStore = cacheStore;
@@ -25,6 +31,7 @@ public class StashHealthCheck : IHealthCheck
         _options = options;
     }
 
+    /// <inheritdoc />
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)

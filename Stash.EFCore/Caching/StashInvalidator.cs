@@ -17,6 +17,13 @@ public class StashInvalidator : IStashInvalidator
     private readonly StashOptions _options;
     private readonly StashStatistics? _statistics;
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="StashInvalidator"/>.
+    /// </summary>
+    /// <param name="cacheStore">The cache store to invalidate entries in.</param>
+    /// <param name="logger">Logger for invalidation events.</param>
+    /// <param name="options">Stash configuration options.</param>
+    /// <param name="statistics">Optional statistics tracker for recording invalidation counts.</param>
     public StashInvalidator(
         ICacheStore cacheStore,
         ILogger<StashInvalidator> logger,
@@ -29,6 +36,7 @@ public class StashInvalidator : IStashInvalidator
         _statistics = statistics as StashStatistics;
     }
 
+    /// <inheritdoc />
     public async Task InvalidateTablesAsync(IEnumerable<string> tableNames, CancellationToken cancellationToken = default)
     {
         var tables = tableNames as IReadOnlyList<string> ?? tableNames.ToList();
@@ -47,6 +55,7 @@ public class StashInvalidator : IStashInvalidator
         await _cacheStore.InvalidateByTagsAsync(tables, cancellationToken);
     }
 
+    /// <inheritdoc />
     public async Task InvalidateEntitiesAsync<TContext>(TContext context, IEnumerable<Type> entityTypes, CancellationToken cancellationToken = default)
         where TContext : DbContext
     {
@@ -78,6 +87,7 @@ public class StashInvalidator : IStashInvalidator
         }
     }
 
+    /// <inheritdoc />
     public async Task InvalidateKeyAsync(string cacheKey, CancellationToken cancellationToken = default)
     {
         _statistics?.RecordInvalidation([]);
@@ -93,6 +103,7 @@ public class StashInvalidator : IStashInvalidator
         await _cacheStore.InvalidateKeyAsync(cacheKey, cancellationToken);
     }
 
+    /// <inheritdoc />
     public async Task InvalidateAllAsync(CancellationToken cancellationToken = default)
     {
         _statistics?.RecordInvalidation([]);

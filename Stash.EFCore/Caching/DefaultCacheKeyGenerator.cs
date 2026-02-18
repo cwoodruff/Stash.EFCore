@@ -14,11 +14,16 @@ public class DefaultCacheKeyGenerator : ICacheKeyGenerator
 {
     private readonly StashOptions _options;
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="DefaultCacheKeyGenerator"/> with the specified options.
+    /// </summary>
+    /// <param name="options">The Stash configuration options, used for the <see cref="StashOptions.KeyPrefix"/>.</param>
     public DefaultCacheKeyGenerator(StashOptions options)
     {
         _options = options;
     }
 
+    /// <inheritdoc />
     public string GenerateKey(DbCommand command)
     {
         var sb = new StringBuilder();
@@ -35,9 +40,14 @@ public class DefaultCacheKeyGenerator : ICacheKeyGenerator
         }
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()));
+#if NET9_0_OR_GREATER
         return $"{_options.KeyPrefix}{Convert.ToHexStringLower(hash)}";
+#else
+        return $"{_options.KeyPrefix}{Convert.ToHexString(hash).ToLowerInvariant()}";
+#endif
     }
 
+    /// <inheritdoc />
     public IReadOnlyCollection<string> ExtractTableDependencies(string commandText)
     {
         return TableDependencyParser.ExtractTableNames(commandText);

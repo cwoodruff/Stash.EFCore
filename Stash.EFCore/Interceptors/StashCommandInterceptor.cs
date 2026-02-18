@@ -33,6 +33,14 @@ public class StashCommandInterceptor : DbCommandInterceptor
     /// </summary>
     private static readonly ConditionalWeakTable<DbCommand, string> PendingCacheKeys = new();
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="StashCommandInterceptor"/>.
+    /// </summary>
+    /// <param name="cacheStore">The cache store for reading and writing cached result sets.</param>
+    /// <param name="keyGenerator">Generates deterministic cache keys from SQL commands.</param>
+    /// <param name="options">Global Stash configuration options.</param>
+    /// <param name="logger">Logger for cache hit/miss/error events.</param>
+    /// <param name="statistics">Optional statistics tracker for recording cache metrics.</param>
     public StashCommandInterceptor(
         ICacheStore cacheStore,
         ICacheKeyGenerator keyGenerator,

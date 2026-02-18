@@ -1,26 +1,63 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <TargetFramework />
+    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
     <RootNamespace>Stash.EFCore</RootNamespace>
+
+    <!-- NuGet package metadata -->
     <PackageId>Stash.EFCore</PackageId>
-    <Description>Transparent second-level query cache for Entity Framework Core</Description>
+    <Version>0.1.0</Version>
     <Authors>Chris Woodruff</Authors>
+    <Description>Transparent second-level query cache for Entity Framework Core. Automatic caching and invalidation with fluent .Stash() API.</Description>
+    <PackageTags>entity-framework-core;ef-core;cache;caching;second-level-cache;query-cache;performance;dotnet</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/cwoodruff/Stash.EFCore</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/cwoodruff/Stash.EFCore</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReleaseNotes>See https://github.com/cwoodruff/Stash.EFCore/blob/main/CHANGELOG.md</PackageReleaseNotes>
+
+    <!-- Build settings -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="" />
+    <None Include="..\icon.png" Pack="true" PackagePath="" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Stash.EFCore.Tests" />
   </ItemGroup>
 
+  <!-- Source Link -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.*" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.*" />
-    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.*" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.*" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.*" PrivateAssets="All" />
   </ItemGroup>
 
-  <ItemGroup Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net10.0'))">
-    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="10.0.*" />
+  <!-- net8.0 dependencies -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="8.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.*" />
+  </ItemGroup>
+
+  <!-- net9.0 dependencies -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.*" />
   </ItemGroup>
 
 </Project>

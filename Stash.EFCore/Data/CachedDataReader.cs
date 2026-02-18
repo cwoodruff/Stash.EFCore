@@ -15,6 +15,11 @@ public sealed class CachedDataReader : DbDataReader
     private int _currentRowIndex = -1;
     private bool _isClosed;
 
+    /// <summary>
+    /// Initializes a new <see cref="CachedDataReader"/> that replays data from the specified cached result set.
+    /// </summary>
+    /// <param name="resultSet">The cached result set to replay. Must not be <c>null</c>.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="resultSet"/> is <c>null</c>.</exception>
     public CachedDataReader(CacheableResultSet resultSet)
     {
         ArgumentNullException.ThrowIfNull(resultSet);

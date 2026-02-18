@@ -21,11 +21,16 @@ public class MemoryCacheStore : ICacheStore
     /// </summary>
     private sealed record CacheEntry(CacheableResultSet Value, long Version);
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="MemoryCacheStore"/> with the specified <see cref="IMemoryCache"/>.
+    /// </summary>
+    /// <param name="cache">The in-memory cache instance to store result sets in.</param>
     public MemoryCacheStore(IMemoryCache cache)
     {
         _cache = cache;
     }
 
+    /// <inheritdoc />
     public Task<CacheableResultSet?> GetAsync(string key, CancellationToken cancellationToken = default)
     {
         if (_cache.TryGetValue(key, out CacheEntry? entry) && entry is not null)
@@ -40,6 +45,7 @@ public class MemoryCacheStore : ICacheStore
         return Task.FromResult<CacheableResultSet?>(null);
     }
 
+    /// <inheritdoc />
     public async Task SetAsync(string key, CacheableResultSet value, TimeSpan absoluteExpiration,
         TimeSpan? slidingExpiration = null, IReadOnlyCollection<string>? tags = null,
         CancellationToken cancellationToken = default)
@@ -87,6 +93,7 @@ public class MemoryCacheStore : ICacheStore
         _cache.Set(key, entry, options);
     }
 
+    /// <inheritdoc />
     public async Task InvalidateByTagsAsync(IEnumerable<string> tags, CancellationToken cancellationToken = default)
     {
         await _tagLock.WaitAsync(cancellationToken);
@@ -123,6 +130,7 @@ public class MemoryCacheStore : ICacheStore
         }
     }
 
+    /// <inheritdoc />
     public Task InvalidateKeyAsync(string key, CancellationToken cancellationToken = default)
     {
         _cache.Remove(key);
@@ -130,6 +138,7 @@ public class MemoryCacheStore : ICacheStore
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task InvalidateAllAsync(CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _version);

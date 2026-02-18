@@ -29,6 +29,13 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
     /// </summary>
     private static readonly ConditionalWeakTable<DbContext, List<string>> PendingInvalidations = new();
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="StashInvalidationInterceptor"/>.
+    /// </summary>
+    /// <param name="cacheStore">The cache store to invalidate entries in.</param>
+    /// <param name="logger">Logger for invalidation events.</param>
+    /// <param name="options">Global Stash configuration options.</param>
+    /// <param name="statistics">Optional statistics tracker for recording invalidation counts.</param>
     public StashInvalidationInterceptor(
         ICacheStore cacheStore,
         ILogger<StashInvalidationInterceptor> logger,

@@ -1,0 +1,59 @@
+name: Benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      filter:
+        description: 'Benchmark filter (e.g. "*KeyGeneration*"). Leave empty for all.'
+        required: false
+        default: ''
+
+permissions:
+  pull-requests: write
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Run benchmarks
+        run: |
+          FILTER="${{ github.event.inputs.filter }}"
+          if [ -n "$FILTER" ]; then
+            dotnet run --project Stash.EFCore.Benchmarks -c Release -- --filter "$FILTER" --exporters json markdown
+          else
+            dotnet run --project Stash.EFCore.Benchmarks -c Release -- --exporters json markdown
+          fi
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: BenchmarkDotNet.Artifacts/**
+
+      - name: Post summary
+        if: always()
+        run: |
+          echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          for f in BenchmarkDotNet.Artifacts/results/*.md; do
+            if [ -f "$f" ]; then
+              cat "$f" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done

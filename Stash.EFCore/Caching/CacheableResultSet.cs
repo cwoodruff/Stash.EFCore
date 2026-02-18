@@ -4,14 +4,24 @@ using System.Data.Common;
 namespace Stash.EFCore.Caching;
 
 /// <summary>
-/// Column metadata for a cached result set.
+/// Column metadata for a cached result set, capturing the schema information
+/// needed to reconstruct a <see cref="System.Data.Common.DbDataReader"/> from cache.
 /// </summary>
 public sealed class ColumnDefinition
 {
+    /// <summary>The column name as reported by the database provider.</summary>
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>Zero-based ordinal position of the column in the result set.</summary>
     public int Ordinal { get; set; }
+
+    /// <summary>Provider-specific data type name (e.g., "nvarchar", "integer").</summary>
     public string DataTypeName { get; set; } = string.Empty;
+
+    /// <summary>The .NET <see cref="Type"/> that values in this column map to.</summary>
     public Type FieldType { get; set; } = typeof(object);
+
+    /// <summary>Whether the column permits NULL values.</summary>
     public bool AllowDBNull { get; set; }
 }
 
@@ -41,8 +51,12 @@ public sealed class CacheableResultSet
     /// <summary>
     /// Captures the result of a live <see cref="DbDataReader"/> into a cacheable structure.
     /// The reader is fully consumed and closed after capture.
-    /// Returns null if the result set exceeds <paramref name="maxRows"/>, signaling "do not cache".
+    /// Returns <c>null</c> if the result set exceeds <paramref name="maxRows"/>, signaling "do not cache".
     /// </summary>
+    /// <param name="reader">The live data reader to capture rows from.</param>
+    /// <param name="maxRows">Maximum number of rows to capture. If exceeded, returns <c>null</c>.</param>
+    /// <param name="ct">A token to cancel the operation.</param>
+    /// <returns>A <see cref="CacheableResultSet"/> containing all rows, or <c>null</c> if the row limit was exceeded.</returns>
     public static async Task<CacheableResultSet?> CaptureAsync(
         DbDataReader reader, int maxRows, CancellationToken ct = default)
     {

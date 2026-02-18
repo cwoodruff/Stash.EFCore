@@ -35,14 +35,20 @@ public class StashStatistics : IStashStatistics
     public IReadOnlyDictionary<string, long> InvalidationsByTable =>
         _invalidationsByTable;
 
+    /// <summary>Records a cache hit.</summary>
     public void RecordHit() => Interlocked.Increment(ref _hits);
 
+    /// <summary>Records a cache miss.</summary>
     public void RecordMiss() => Interlocked.Increment(ref _misses);
 
+    /// <summary>Records a cache error.</summary>
     public void RecordError() => Interlocked.Increment(ref _errors);
 
+    /// <summary>Records a skipped cache operation (row/size limit exceeded).</summary>
     public void RecordSkip() => Interlocked.Increment(ref _skips);
 
+    /// <summary>Records an invalidation event and updates per-table counters.</summary>
+    /// <param name="tables">The table names that were invalidated.</param>
     public void RecordInvalidation(IReadOnlyList<string> tables)
     {
         Interlocked.Increment(ref _invalidations);
@@ -52,11 +58,15 @@ public class StashStatistics : IStashStatistics
         }
     }
 
+    /// <summary>Records bytes added to the cache.</summary>
+    /// <param name="bytes">The approximate byte size of the cached entry.</param>
     public void RecordCachedBytes(long bytes)
     {
         Interlocked.Add(ref _totalBytesCached, bytes);
     }
 
+    /// <summary>Records bytes removed from the cache (eviction).</summary>
+    /// <param name="bytes">The approximate byte size of the evicted entry.</param>
     public void RecordEvictedBytes(long bytes)
     {
         Interlocked.Add(ref _totalBytesCached, -bytes);

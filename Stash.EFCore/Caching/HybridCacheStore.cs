@@ -22,11 +22,16 @@ public class HybridCacheStore : ICacheStore
         Flags = HybridCacheEntryFlags.DisableLocalCacheWrite | HybridCacheEntryFlags.DisableDistributedCacheWrite
     };
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="HybridCacheStore"/> with the specified <see cref="HybridCache"/>.
+    /// </summary>
+    /// <param name="cache">The hybrid cache instance (L1 memory + L2 distributed).</param>
     public HybridCacheStore(HybridCache cache)
     {
         _cache = cache;
     }
 
+    /// <inheritdoc />
     public async Task<CacheableResultSet?> GetAsync(string key, CancellationToken cancellationToken = default)
     {
         var versionedKey = VersionedKey(key);
@@ -43,6 +48,7 @@ public class HybridCacheStore : ICacheStore
         return CacheableResultSetSerializer.Deserialize(result);
     }
 
+    /// <inheritdoc />
     public async Task SetAsync(string key, CacheableResultSet value, TimeSpan absoluteExpiration,
         TimeSpan? slidingExpiration = null, IReadOnlyCollection<string>? tags = null,
         CancellationToken cancellationToken = default)
@@ -60,6 +66,7 @@ public class HybridCacheStore : ICacheStore
         await _cache.SetAsync(versionedKey, bytes, options, tagList, cancellationToken);
     }
 
+    /// <inheritdoc />
     public async Task InvalidateByTagsAsync(IEnumerable<string> tags, CancellationToken cancellationToken = default)
     {
         foreach (var tag in tags)
@@ -68,12 +75,14 @@ public class HybridCacheStore : ICacheStore
         }
     }
 
+    /// <inheritdoc />
     public async Task InvalidateKeyAsync(string key, CancellationToken cancellationToken = default)
     {
         var versionedKey = VersionedKey(key);
         await _cache.RemoveAsync(versionedKey, cancellationToken);
     }
 
+    /// <inheritdoc />
     public Task InvalidateAllAsync(CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _version);
