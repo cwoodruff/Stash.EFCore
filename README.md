@@ -110,7 +110,8 @@ services.AddStash(options =>
 services.AddStash(options =>
 {
     options.CacheAllQueries = true;
-    options.ExcludedTables = ["AuditLog", "Sessions"];
+    options.ExcludedTables.Add("AuditLog");
+    options.ExcludedTables.Add("Sessions");
 });
 // Every SELECT is cached automatically. Use .NoStash() to opt out per-query.
 ```
@@ -164,40 +165,40 @@ builder.Services.AddHealthChecks().AddStashHealthCheck();
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                       EF Core Query                          │
-│                  db.Products.Cached().ToListAsync()           │
-└─────────────────────────┬────────────────────────────────────┘
-                          │
-              ┌───────────▼────────────┐
-              │ StashCommandInterceptor │
-              │  (DbCommandInterceptor) │
-              └───────────┬────────────┘
-                          │
-               ┌──────────┴──────────┐
-               │                     │
-        ┌──────▼──────┐       ┌──────▼──────┐
-        │  Cache Hit  │       │ Cache Miss  │
-        │  Return     │       │ Execute DB  │
-        │  cached     │       │ Cache result│
-        │  reader     │       │ Return data │
-        └─────────────┘       └──────┬──────┘
-                                     │
-          ┌──────────────────────────▼─────────────────────────┐
-          │                    ICacheStore                      │
-          │  ┌────────────────┐    ┌─────────────────────────┐ │
-          │  │ MemoryCacheStore│    │ HybridCacheStore (.NET 9)│ │
-          │  │ (IMemoryCache) │    │ (L1 memory + L2 distrib)│ │
-          │  └────────────────┘    └─────────────────────────┘ │
-          └────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│                  EF Core Query                  │
+│         db.Products.Cached().ToListAsync()      │
+└────────────────────────┬────────────────────────┘
+                         │
+             ┌───────────▼──────────┐
+             │ StashCommandInterceptor │
+             │ (DbCommandInterceptor)  │
+             └───────────┬─────────────┘
+                         │
+              ┌──────────┴──────────┐
+              │                     │
+       ┌──────▼──────┐      ┌──────▼──────┐
+       │  Cache Hit  │      │ Cache Miss  │
+       │  Return     │      │ Execute DB, │
+       │  cached     │      │ cache result│
+       │  reader     │      │ return data │
+       └─────────────┘      └──────┬──────┘
+                                   │
+       ┌───────────────────────────▼──────────────────────────┐
+       │                     ICacheStore                      │
+       │  ┌─────────────────┐   ┌──────────────────────────┐ │
+       │  │ MemoryCacheStore │   │ HybridCacheStore (.NET 9) │ │
+       │  │  (IMemoryCache)  │   │ (L1 memory + L2 distrib) │ │
+       │  └─────────────────┘   └──────────────────────────┘ │
+       └──────────────────────────────────────────────────────┘
 
-              ┌────────────────────────────────┐
-              │ StashInvalidationInterceptor   │
-              │  (SaveChangesInterceptor)      │
-              │                                │
-              │  SavingChanges → capture tables │
-              │  SavedChanges → invalidate tags │
-              └────────────────────────────────┘
+            ┌──────────────────────────────────┐
+            │  StashInvalidationInterceptor    │
+            │  (SaveChangesInterceptor)        │
+            │                                  │
+            │  SavingChanges → capture tables  │
+            │  SavedChanges  → invalidate tags │
+            └──────────────────────────────────┘
 ```
 
 ## Comparison
@@ -237,10 +238,8 @@ Stash emits structured log events with dedicated `EventId` values:
 
 ## Roadmap
 
-- **v0.1.0** - Core interceptors + MemoryCacheStore + `.Cached()` API + auto-invalidation
-- **v0.2.0** - HybridCacheStore + named profiles + diagnostics/stats
-- **v0.3.0** - Health check + benchmarks + perf optimizations
-- **v1.0.0** - Stable API + comprehensive docs + community feedback
+- **v0.1.0** (current) - Core interceptors, MemoryCacheStore, HybridCacheStore, `.Cached()` API, auto-invalidation, manual invalidation, named profiles, diagnostics/stats, health check, benchmarks
+- **v1.0.0** - Stable API after community feedback + additional database provider testing
 
 ## Contributing
 
