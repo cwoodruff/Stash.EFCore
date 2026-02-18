@@ -2,11 +2,13 @@ using System.Data.Common;
 using System.Security.Cryptography;
 using System.Text;
 using Stash.EFCore.Configuration;
+using Stash.EFCore.Data;
 
 namespace Stash.EFCore.Caching;
 
 /// <summary>
-/// Default cache key generator that produces a SHA256 hash of SQL + parameters.
+/// Default cache key generator that produces a SHA256 hash of SQL + parameters,
+/// and delegates table extraction to <see cref="TableDependencyParser"/>.
 /// </summary>
 public class DefaultCacheKeyGenerator : ICacheKeyGenerator
 {
@@ -34,5 +36,10 @@ public class DefaultCacheKeyGenerator : ICacheKeyGenerator
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()));
         return $"{_options.KeyPrefix}{Convert.ToHexStringLower(hash)}";
+    }
+
+    public IReadOnlyCollection<string> ExtractTableDependencies(string commandText)
+    {
+        return TableDependencyParser.ExtractTableNames(commandText);
     }
 }

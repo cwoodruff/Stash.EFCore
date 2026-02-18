@@ -99,7 +99,13 @@ public sealed class CachedDataReader : DbDataReader
         var value = _resultSet.Rows[_currentRowIndex][ordinal];
         if (value is null)
             throw new InvalidCastException($"Cannot cast DBNull to {typeof(T).Name}.");
-        return (T)value;
+
+        // Fast path: exact type match
+        if (value is T typed)
+            return typed;
+
+        // Slow path: numeric and other IConvertible conversions (e.g., Int64 → Int32 from SQLite)
+        return (T)Convert.ChangeType(value, typeof(T));
     }
 
     public override Task<T> GetFieldValueAsync<T>(int ordinal, CancellationToken cancellationToken)

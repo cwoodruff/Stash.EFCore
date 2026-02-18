@@ -21,9 +21,16 @@ public class StashOptions
     public string KeyPrefix { get; set; } = "stash:";
 
     /// <summary>
-    /// When true, all queries are cached automatically without requiring .Stash().
+    /// When true, all SELECT queries are cached automatically without requiring <c>.Stash()</c>.
+    /// Queries targeting tables in <see cref="ExcludedTables"/> are still excluded.
     /// </summary>
-    public bool EnableGlobalCaching { get; set; }
+    public bool CacheAllQueries { get; set; }
+
+    /// <summary>
+    /// Table names that should never be cached when <see cref="CacheAllQueries"/> is true.
+    /// Has no effect on queries explicitly tagged with <c>.Stash()</c>.
+    /// </summary>
+    public HashSet<string> ExcludedTables { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// When true, cache hit/miss events are logged via ILogger.
@@ -31,9 +38,22 @@ public class StashOptions
     public bool EnableLogging { get; set; } = true;
 
     /// <summary>
-    /// Maximum number of rows to cache per query. Queries returning more rows are not cached.
+    /// Maximum number of rows to cache per query. Queries returning more rows are not cached
+    /// but their results are still returned to EF Core.
     /// </summary>
-    public int MaxCachedRowsPerQuery { get; set; } = 10_000;
+    public int MaxRowsPerQuery { get; set; } = 10_000;
+
+    /// <summary>
+    /// Maximum size in bytes for a single cache entry. Entries larger than this are not cached.
+    /// Set to 0 (default) to disable the size limit.
+    /// </summary>
+    public long MaxCacheEntrySize { get; set; }
+
+    /// <summary>
+    /// When true (default), cache store exceptions are caught and the query falls back to the database.
+    /// When false, cache store exceptions propagate to the caller.
+    /// </summary>
+    public bool FallbackToDatabase { get; set; } = true;
 
     /// <summary>
     /// Named caching profiles for per-query configuration.
