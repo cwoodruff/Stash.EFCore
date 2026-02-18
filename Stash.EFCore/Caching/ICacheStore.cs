@@ -21,4 +21,9 @@ public interface ICacheStore
     /// Invalidates all cache entries tagged with any of the specified table names.
     /// </summary>
     Task InvalidateByTagsAsync(IEnumerable<string> tags, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Invalidates all cache entries regardless of tags.
+    /// </summary>
+    Task InvalidateAllAsync(CancellationToken cancellationToken = default);
 }

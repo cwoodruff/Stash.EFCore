@@ -1,14 +1,25 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace Stash.EFCore.Caching;
 
 /// <summary>
 /// Cache store backed by <see cref="IMemoryCache"/> for single-server scenarios.
+/// Uses a version counter for <see cref="InvalidateAllAsync"/> and a
+/// <see cref="SemaphoreSlim"/>-protected tag index for table-based invalidation.
 /// </summary>
 public class MemoryCacheStore : ICacheStore
 {
     private readonly IMemoryCache _cache;
-    private readonly ConcurrentTagIndex _tagIndex = new();
+    private readonly SemaphoreSlim _tagLock = new(1, 1);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _tagToKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, HashSet<string>> _keyToTags = new();
+    private long _version;
+
+    /// <summary>
+    /// Wrapper stored in IMemoryCache so GetAsync can check the version counter.
+    /// </summary>
+    private sealed record CacheEntry(CacheableResultSet Value, long Version);
 
     public MemoryCacheStore(IMemoryCache cache)
     {
@@ -17,17 +28,29 @@ public class MemoryCacheStore : ICacheStore
 
     public Task<CacheableResultSet?> GetAsync(string key, CancellationToken cancellationToken = default)
     {
-        _cache.TryGetValue(key, out CacheableResultSet? result);
-        return Task.FromResult(result);
+        if (_cache.TryGetValue(key, out CacheEntry? entry) && entry is not null)
+        {
+            if (entry.Version == Interlocked.Read(ref _version))
+                return Task.FromResult<CacheableResultSet?>(entry.Value);
+
+            // Version mismatch — logically expired by InvalidateAllAsync
+            _cache.Remove(key);
+        }
+
+        return Task.FromResult<CacheableResultSet?>(null);
     }
 
-    public Task SetAsync(string key, CacheableResultSet value, TimeSpan absoluteExpiration,
+    public async Task SetAsync(string key, CacheableResultSet value, TimeSpan absoluteExpiration,
         TimeSpan? slidingExpiration = null, IReadOnlyCollection<string>? tags = null,
         CancellationToken cancellationToken = default)
     {
+        var currentVersion = Interlocked.Read(ref _version);
+        var entry = new CacheEntry(value, currentVersion);
+
         var options = new MemoryCacheEntryOptions
         {
-            AbsoluteExpirationRelativeToNow = absoluteExpiration
+            AbsoluteExpirationRelativeToNow = absoluteExpiration,
+            Size = value.ApproximateSizeBytes
         };
 
         if (slidingExpiration.HasValue)
@@ -36,82 +59,94 @@ public class MemoryCacheStore : ICacheStore
         options.RegisterPostEvictionCallback((k, _, _, _) =>
         {
             if (k is string keyStr)
-                _tagIndex.RemoveKey(keyStr);
+                TryRemoveKeyFromTagIndex(keyStr);
         });
 
-        _cache.Set(key, value, options);
-
         if (tags is { Count: > 0 })
-            _tagIndex.Add(key, tags);
-
-        return Task.CompletedTask;
-    }
-
-    public Task InvalidateByTagsAsync(IEnumerable<string> tags, CancellationToken cancellationToken = default)
-    {
-        foreach (var key in _tagIndex.GetKeysByTags(tags))
         {
-            _cache.Remove(key);
-            _tagIndex.RemoveKey(key);
-        }
-
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Thread-safe index mapping cache keys to table dependency tags and vice versa.
-    /// </summary>
-    private sealed class ConcurrentTagIndex
-    {
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, HashSet<string>> _keyToTags = new();
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, HashSet<string>> _tagToKeys = new();
-        private readonly object _lock = new();
-
-        public void Add(string key, IEnumerable<string> tags)
-        {
-            lock (_lock)
+            await _tagLock.WaitAsync(cancellationToken);
+            try
             {
+                TryRemoveKeyFromTagIndex(key);
+
                 var tagSet = new HashSet<string>(tags, StringComparer.OrdinalIgnoreCase);
                 _keyToTags[key] = tagSet;
 
                 foreach (var tag in tagSet)
                 {
-                    var keys = _tagToKeys.GetOrAdd(tag, _ => new HashSet<string>());
-                    keys.Add(key);
+                    var keys = _tagToKeys.GetOrAdd(tag, _ => new ConcurrentDictionary<string, byte>());
+                    keys[key] = 0;
                 }
+            }
+            finally
+            {
+                _tagLock.Release();
             }
         }
 
-        public IEnumerable<string> GetKeysByTags(IEnumerable<string> tags)
-        {
-            var result = new HashSet<string>();
-            lock (_lock)
-            {
-                foreach (var tag in tags)
-                {
-                    if (_tagToKeys.TryGetValue(tag, out var keys))
-                        result.UnionWith(keys);
-                }
-            }
+        _cache.Set(key, entry, options);
+    }
 
-            return result;
-        }
-
-        public void RemoveKey(string key)
+    public async Task InvalidateByTagsAsync(IEnumerable<string> tags, CancellationToken cancellationToken = default)
+    {
+        await _tagLock.WaitAsync(cancellationToken);
+        try
         {
-            lock (_lock)
+            foreach (var tag in tags)
             {
-                if (_keyToTags.TryRemove(key, out var tags))
+                if (_tagToKeys.TryRemove(tag, out var keys))
                 {
-                    foreach (var tag in tags)
+                    foreach (var key in keys.Keys)
                     {
-                        if (_tagToKeys.TryGetValue(tag, out var keys))
+                        _cache.Remove(key);
+
+                        if (_keyToTags.TryRemove(key, out var keyTags))
                         {
-                            keys.Remove(key);
-                            if (keys.Count == 0)
-                                _tagToKeys.TryRemove(tag, out _);
+                            foreach (var otherTag in keyTags)
+                            {
+                                if (!string.Equals(otherTag, tag, StringComparison.OrdinalIgnoreCase) &&
+                                    _tagToKeys.TryGetValue(otherTag, out var otherKeys))
+                                {
+                                    otherKeys.TryRemove(key, out _);
+                                    if (otherKeys.IsEmpty)
+                                        _tagToKeys.TryRemove(otherTag, out _);
+                                }
+                            }
                         }
                     }
+                }
+            }
+        }
+        finally
+        {
+            _tagLock.Release();
+        }
+    }
+
+    public Task InvalidateAllAsync(CancellationToken cancellationToken = default)
+    {
+        Interlocked.Increment(ref _version);
+        _tagToKeys.Clear();
+        _keyToTags.Clear();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Best-effort cleanup of tag index entries for a key. Called from PostEvictionCallback
+    /// (without holding the semaphore) and from SetAsync (while holding it).
+    /// Uses only lock-free ConcurrentDictionary operations.
+    /// </summary>
+    private void TryRemoveKeyFromTagIndex(string key)
+    {
+        if (_keyToTags.TryRemove(key, out var tags))
+        {
+            foreach (var tag in tags)
+            {
+                if (_tagToKeys.TryGetValue(tag, out var keys))
+                {
+                    keys.TryRemove(key, out _);
+                    if (keys.IsEmpty)
+                        _tagToKeys.TryRemove(tag, out _);
                 }
             }
         }
