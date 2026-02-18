@@ -1,4 +1,3 @@
 using BenchmarkDotNet.Running;
-using Stash.EFCore.Benchmarks;
 
-BenchmarkRunner.Run<QueryCacheBenchmark>();
+BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
