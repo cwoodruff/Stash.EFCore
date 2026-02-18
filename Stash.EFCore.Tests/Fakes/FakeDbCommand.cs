@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Stash.EFCore.Tests.Fakes;
 
@@ -16,6 +17,7 @@ internal sealed class FakeDbCommand : DbCommand
         _parameters = new FakeDbParameterCollection(parameters);
     }
 
+    [AllowNull]
     public override string CommandText { get; set; } = "";
     public override int CommandTimeout { get; set; }
     public override CommandType CommandType { get; set; } = CommandType.Text;
@@ -49,8 +51,10 @@ internal sealed class FakeDbParameter : DbParameter
     public override DbType DbType { get; set; }
     public override ParameterDirection Direction { get; set; }
     public override bool IsNullable { get; set; }
+    [AllowNull]
     public override string ParameterName { get; set; }
     public override int Size { get; set; }
+    [AllowNull]
     public override string SourceColumn { get; set; } = "";
     public override bool SourceColumnNullMapping { get; set; }
     public override object? Value { get; set; }
