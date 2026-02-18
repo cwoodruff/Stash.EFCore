@@ -46,7 +46,7 @@ public sealed class BenchmarkFixture : IDisposable
         CommandInterceptor = new StashCommandInterceptor(
             CacheStore, KeyGenerator, Options, NullLogger<StashCommandInterceptor>.Instance);
         InvalidationInterceptor = new StashInvalidationInterceptor(
-            CacheStore, NullLogger<StashInvalidationInterceptor>.Instance);
+            CacheStore, NullLogger<StashInvalidationInterceptor>.Instance, Options);
 
         _cachedContextOptions = new DbContextOptionsBuilder<BenchmarkDbContext>()
             .UseSqlite(Connection)

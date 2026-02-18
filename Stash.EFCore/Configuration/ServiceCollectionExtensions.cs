@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Stash.EFCore.Caching;
+using Stash.EFCore.Diagnostics;
 using Stash.EFCore.Interceptors;
 
 namespace Stash.EFCore.Configuration;
@@ -23,6 +24,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<StashInvalidationInterceptor>();
         services.TryAddSingleton<IStashInvalidator, StashInvalidator>();
 
+        // Diagnostics
+        var stats = new StashStatistics();
+        services.TryAddSingleton<IStashStatistics>(stats);
+        services.TryAddSingleton(stats);
+
         return services;
     }
 
@@ -44,7 +50,33 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<StashInvalidationInterceptor>();
         services.TryAddSingleton<IStashInvalidator, StashInvalidator>();
 
+        // Diagnostics
+        var stats = new StashStatistics();
+        services.TryAddSingleton<IStashStatistics>(stats);
+        services.TryAddSingleton(stats);
+
         return services;
     }
 #endif
+
+    /// <summary>
+    /// Adds the Stash cache health check to the health checks builder.
+    /// </summary>
+    public static IHealthChecksBuilder AddStashHealthCheck(
+        this IHealthChecksBuilder builder,
+        string name = "stash-cache",
+        Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus? failureStatus = null,
+        IEnumerable<string>? tags = null)
+    {
+        builder.Add(new Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckRegistration(
+            name,
+            sp => new StashHealthCheck(
+                sp.GetRequiredService<ICacheStore>(),
+                sp.GetRequiredService<IStashStatistics>(),
+                sp.GetRequiredService<StashOptions>()),
+            failureStatus,
+            tags));
+
+        return builder;
+    }
 }

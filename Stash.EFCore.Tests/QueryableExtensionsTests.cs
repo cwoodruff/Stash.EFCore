@@ -64,7 +64,7 @@ public class QueryableExtensionsTests : IDisposable
         _commandInterceptor = new StashCommandInterceptor(
             _cacheStore, keyGen, _options, NullLogger<StashCommandInterceptor>.Instance);
         var invalidationInterceptor = new StashInvalidationInterceptor(
-            _cacheStore, NullLogger<StashInvalidationInterceptor>.Instance);
+            _cacheStore, NullLogger<StashInvalidationInterceptor>.Instance, _options);
 
         var contextOptions = new DbContextOptionsBuilder<QeDbContext>()
             .UseSqlite(_connection)

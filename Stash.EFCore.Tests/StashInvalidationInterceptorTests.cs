@@ -139,7 +139,7 @@ public class StashInvalidationInterceptorTests : IDisposable
         _commandInterceptor = new StashCommandInterceptor(
             _cacheStore, keyGen, _options, NullLogger<StashCommandInterceptor>.Instance);
         _invalidationInterceptor = new StashInvalidationInterceptor(
-            _cacheStore, NullLogger<StashInvalidationInterceptor>.Instance);
+            _cacheStore, NullLogger<StashInvalidationInterceptor>.Instance, _options);
 
         var contextOptions = new DbContextOptionsBuilder<InvDbContext>()
             .UseSqlite(_connection)
@@ -500,7 +500,7 @@ public class StashInvalidationInterceptorTests : IDisposable
         result1.Should().HaveCount(1);
 
         // Use manual invalidator
-        var invalidator = new StashInvalidator(_cacheStore, NullLogger<StashInvalidator>.Instance);
+        var invalidator = new StashInvalidator(_cacheStore, NullLogger<StashInvalidator>.Instance, _options);
         await invalidator.InvalidateTablesAsync(["products"]);
 
         // Add another product directly via SQL (bypasses interceptor)
@@ -524,7 +524,7 @@ public class StashInvalidationInterceptorTests : IDisposable
         result1.Should().HaveCount(1);
 
         // Use entity-based invalidation
-        var invalidator = new StashInvalidator(_cacheStore, NullLogger<StashInvalidator>.Instance);
+        var invalidator = new StashInvalidator(_cacheStore, NullLogger<StashInvalidator>.Instance, _options);
         await invalidator.InvalidateEntitiesAsync(_context, [typeof(InvProduct)]);
 
         // Add another product via raw SQL
@@ -548,7 +548,7 @@ public class StashInvalidationInterceptorTests : IDisposable
         var orders1 = await _context.Orders.ToListAsync();
 
         // Invalidate all
-        var invalidator = new StashInvalidator(_cacheStore, NullLogger<StashInvalidator>.Instance);
+        var invalidator = new StashInvalidator(_cacheStore, NullLogger<StashInvalidator>.Instance, _options);
         await invalidator.InvalidateAllAsync();
 
         // Add data via raw SQL

@@ -1,10 +1,12 @@
 using System.Data.Common;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Stash.EFCore.Caching;
 using Stash.EFCore.Configuration;
 using Stash.EFCore.Data;
+using Stash.EFCore.Diagnostics;
 using Stash.EFCore.Extensions;
 using Stash.EFCore.Logging;
 
@@ -21,6 +23,7 @@ public class StashCommandInterceptor : DbCommandInterceptor
     private readonly ICacheKeyGenerator _keyGenerator;
     private readonly StashOptions _options;
     private readonly ILogger<StashCommandInterceptor> _logger;
+    private readonly StashStatistics? _statistics;
 
     /// <summary>
     /// Passes cache keys from Executing → Executed. Uses ConditionalWeakTable
@@ -34,12 +37,14 @@ public class StashCommandInterceptor : DbCommandInterceptor
         ICacheStore cacheStore,
         ICacheKeyGenerator keyGenerator,
         StashOptions options,
-        ILogger<StashCommandInterceptor> logger)
+        ILogger<StashCommandInterceptor> logger,
+        IStashStatistics? statistics = null)
     {
         _cacheStore = cacheStore;
         _keyGenerator = keyGenerator;
         _options = options;
         _logger = logger;
+        _statistics = statistics as StashStatistics;
     }
 
     #region Reader interception — async
@@ -57,21 +62,30 @@ public class StashCommandInterceptor : DbCommandInterceptor
 
         try
         {
+            var sw = Stopwatch.StartNew();
             var cached = await _cacheStore.GetAsync(cacheKey, cancellationToken);
+            sw.Stop();
+
             if (cached is not null)
             {
+                _statistics?.RecordHit();
                 _logger.LogDebug(StashEventIds.CacheHit, "Cache hit for key {CacheKey}", cacheKey);
+                FireEvent(StashEventType.CacheHit, cacheKey, duration: sw.Elapsed);
                 return InterceptionResult<DbDataReader>.SuppressWithResult(new CachedDataReader(cached));
             }
         }
         catch (Exception ex) when (_options.FallbackToDatabase)
         {
+            _statistics?.RecordError();
             _logger.LogWarning(StashEventIds.CacheError, ex,
                 "Cache read failed for key {CacheKey}, falling back to database", cacheKey);
+            FireEvent(StashEventType.CacheFallbackToDb, cacheKey, exception: ex);
             return result;
         }
 
+        _statistics?.RecordMiss();
         _logger.LogDebug(StashEventIds.CacheMiss, "Cache miss for key {CacheKey}", cacheKey);
+        FireEvent(StashEventType.CacheMiss, cacheKey);
         StoreKeyForExecution(command, cacheKey);
         return result;
     }
@@ -116,21 +130,30 @@ public class StashCommandInterceptor : DbCommandInterceptor
 
         try
         {
+            var sw = Stopwatch.StartNew();
             var cached = _cacheStore.GetAsync(cacheKey).GetAwaiter().GetResult();
+            sw.Stop();
+
             if (cached is not null)
             {
+                _statistics?.RecordHit();
                 _logger.LogDebug(StashEventIds.CacheHit, "Cache hit for key {CacheKey}", cacheKey);
+                FireEvent(StashEventType.CacheHit, cacheKey, duration: sw.Elapsed);
                 return InterceptionResult<DbDataReader>.SuppressWithResult(new CachedDataReader(cached));
             }
         }
         catch (Exception ex) when (_options.FallbackToDatabase)
         {
+            _statistics?.RecordError();
             _logger.LogWarning(StashEventIds.CacheError, ex,
                 "Cache read failed for key {CacheKey}, falling back to database", cacheKey);
+            FireEvent(StashEventType.CacheFallbackToDb, cacheKey, exception: ex);
             return result;
         }
 
+        _statistics?.RecordMiss();
         _logger.LogDebug(StashEventIds.CacheMiss, "Cache miss for key {CacheKey}", cacheKey);
+        FireEvent(StashEventType.CacheMiss, cacheKey);
         StoreKeyForExecution(command, cacheKey);
         return result;
     }
@@ -174,22 +197,31 @@ public class StashCommandInterceptor : DbCommandInterceptor
 
         try
         {
+            var sw = Stopwatch.StartNew();
             var cached = await _cacheStore.GetAsync(cacheKey, cancellationToken);
+            sw.Stop();
+
             if (cached is not null)
             {
+                _statistics?.RecordHit();
                 _logger.LogDebug(StashEventIds.CacheHit, "Cache hit for scalar key {CacheKey}", cacheKey);
+                FireEvent(StashEventType.CacheHit, cacheKey, duration: sw.Elapsed);
                 var scalarValue = ExtractScalarValue(cached) ?? DBNull.Value;
                 return InterceptionResult<object>.SuppressWithResult(scalarValue);
             }
         }
         catch (Exception ex) when (_options.FallbackToDatabase)
         {
+            _statistics?.RecordError();
             _logger.LogWarning(StashEventIds.CacheError, ex,
                 "Cache read failed for scalar key {CacheKey}, falling back to database", cacheKey);
+            FireEvent(StashEventType.CacheFallbackToDb, cacheKey, exception: ex);
             return result;
         }
 
+        _statistics?.RecordMiss();
         _logger.LogDebug(StashEventIds.CacheMiss, "Cache miss for scalar key {CacheKey}", cacheKey);
+        FireEvent(StashEventType.CacheMiss, cacheKey);
         StoreKeyForExecution(command, cacheKey);
         return result;
     }
@@ -211,14 +243,19 @@ public class StashCommandInterceptor : DbCommandInterceptor
         try
         {
             await _cacheStore.SetAsync(cacheKey, captured, absoluteTtl, slidingTtl, tables, cancellationToken);
-            _logger.LogDebug(StashEventIds.CacheStore,
+            _statistics?.RecordCachedBytes(captured.ApproximateSizeBytes);
+            _logger.LogDebug(StashEventIds.QueryResultCached,
                 "Cached scalar result for key {CacheKey}, tables: [{Tables}]",
                 cacheKey, string.Join(", ", tables));
+            FireEvent(StashEventType.QueryResultCached, cacheKey, tables: tables,
+                rowCount: 1, sizeBytes: captured.ApproximateSizeBytes, ttl: absoluteTtl);
         }
         catch (Exception ex) when (_options.FallbackToDatabase)
         {
+            _statistics?.RecordError();
             _logger.LogWarning(StashEventIds.CacheError, ex,
                 "Cache write failed for scalar key {CacheKey}", cacheKey);
+            FireEvent(StashEventType.CacheError, cacheKey, exception: ex);
         }
 
         return result;
@@ -240,22 +277,31 @@ public class StashCommandInterceptor : DbCommandInterceptor
 
         try
         {
+            var sw = Stopwatch.StartNew();
             var cached = _cacheStore.GetAsync(cacheKey).GetAwaiter().GetResult();
+            sw.Stop();
+
             if (cached is not null)
             {
+                _statistics?.RecordHit();
                 _logger.LogDebug(StashEventIds.CacheHit, "Cache hit for scalar key {CacheKey}", cacheKey);
+                FireEvent(StashEventType.CacheHit, cacheKey, duration: sw.Elapsed);
                 var scalarValue = ExtractScalarValue(cached) ?? DBNull.Value;
                 return InterceptionResult<object>.SuppressWithResult(scalarValue);
             }
         }
         catch (Exception ex) when (_options.FallbackToDatabase)
         {
+            _statistics?.RecordError();
             _logger.LogWarning(StashEventIds.CacheError, ex,
                 "Cache read failed for scalar key {CacheKey}, falling back to database", cacheKey);
+            FireEvent(StashEventType.CacheFallbackToDb, cacheKey, exception: ex);
             return result;
         }
 
+        _statistics?.RecordMiss();
         _logger.LogDebug(StashEventIds.CacheMiss, "Cache miss for scalar key {CacheKey}", cacheKey);
+        FireEvent(StashEventType.CacheMiss, cacheKey);
         StoreKeyForExecution(command, cacheKey);
         return result;
     }
@@ -277,14 +323,19 @@ public class StashCommandInterceptor : DbCommandInterceptor
         {
             _cacheStore.SetAsync(cacheKey, captured, absoluteTtl, slidingTtl, tables)
                 .GetAwaiter().GetResult();
-            _logger.LogDebug(StashEventIds.CacheStore,
+            _statistics?.RecordCachedBytes(captured.ApproximateSizeBytes);
+            _logger.LogDebug(StashEventIds.QueryResultCached,
                 "Cached scalar result for key {CacheKey}, tables: [{Tables}]",
                 cacheKey, string.Join(", ", tables));
+            FireEvent(StashEventType.QueryResultCached, cacheKey, tables: tables,
+                rowCount: 1, sizeBytes: captured.ApproximateSizeBytes, ttl: absoluteTtl);
         }
         catch (Exception ex) when (_options.FallbackToDatabase)
         {
+            _statistics?.RecordError();
             _logger.LogWarning(StashEventIds.CacheError, ex,
                 "Cache write failed for scalar key {CacheKey}", cacheKey);
+            FireEvent(StashEventType.CacheError, cacheKey, exception: ex);
         }
 
         return result;
@@ -324,7 +375,13 @@ public class StashCommandInterceptor : DbCommandInterceptor
             {
                 var tables = _keyGenerator.ExtractTableDependencies(sql);
                 if (tables.Any(t => _options.ExcludedTables.Contains(t)))
+                {
+                    _logger.LogDebug(StashEventIds.SkippedExcludedTable,
+                        "Skipping cache for excluded table(s): [{Tables}]",
+                        string.Join(", ", tables));
+                    FireEvent(StashEventType.SkippedExcludedTable, tables: tables);
                     return false;
+                }
             }
 
             return true;
@@ -427,17 +484,21 @@ public class StashCommandInterceptor : DbCommandInterceptor
     {
         if (captured.Rows.Length > _options.MaxRowsPerQuery)
         {
+            _statistics?.RecordSkip();
             _logger.LogDebug(StashEventIds.SkippedTooManyRows,
                 "Skipping cache for key {CacheKey}: {RowCount} rows exceeds limit of {MaxRows}",
                 cacheKey, captured.Rows.Length, _options.MaxRowsPerQuery);
+            FireEvent(StashEventType.SkippedTooManyRows, cacheKey, rowCount: captured.Rows.Length);
             return;
         }
 
         if (_options.MaxCacheEntrySize > 0 && captured.ApproximateSizeBytes > _options.MaxCacheEntrySize)
         {
+            _statistics?.RecordSkip();
             _logger.LogDebug(StashEventIds.SkippedTooLarge,
                 "Skipping cache for key {CacheKey}: {Size} bytes exceeds limit of {MaxSize}",
                 cacheKey, captured.ApproximateSizeBytes, _options.MaxCacheEntrySize);
+            FireEvent(StashEventType.SkippedTooLarge, cacheKey, sizeBytes: captured.ApproximateSizeBytes);
             return;
         }
 
@@ -446,16 +507,49 @@ public class StashCommandInterceptor : DbCommandInterceptor
         try
         {
             await _cacheStore.SetAsync(cacheKey, captured, absoluteTtl, slidingTtl, tables, cancellationToken);
+            _statistics?.RecordCachedBytes(captured.ApproximateSizeBytes);
 
-            _logger.LogDebug(StashEventIds.CacheStore,
-                "Cached {RowCount} rows for key {CacheKey}, tables: [{Tables}]",
-                captured.Rows.Length, cacheKey, string.Join(", ", tables));
+            _logger.LogDebug(StashEventIds.QueryResultCached,
+                "Cached {RowCount} rows ({SizeBytes} bytes) for key {CacheKey}, tables: [{Tables}], TTL: {Ttl}",
+                captured.Rows.Length, captured.ApproximateSizeBytes, cacheKey,
+                string.Join(", ", tables), absoluteTtl);
+            FireEvent(StashEventType.QueryResultCached, cacheKey, tables: tables,
+                rowCount: captured.Rows.Length, sizeBytes: captured.ApproximateSizeBytes, ttl: absoluteTtl);
         }
         catch (Exception ex) when (_options.FallbackToDatabase)
         {
+            _statistics?.RecordError();
             _logger.LogWarning(StashEventIds.CacheError, ex,
                 "Cache write failed for key {CacheKey}", cacheKey);
+            FireEvent(StashEventType.CacheError, cacheKey, exception: ex);
         }
+    }
+
+    #endregion
+
+    #region Event firing
+
+    private void FireEvent(
+        StashEventType eventType,
+        string? cacheKey = null,
+        IReadOnlyCollection<string>? tables = null,
+        int? rowCount = null,
+        long? sizeBytes = null,
+        TimeSpan? ttl = null,
+        TimeSpan? duration = null,
+        Exception? exception = null)
+    {
+        _options.OnStashEvent?.Invoke(new StashEvent
+        {
+            EventType = eventType,
+            CacheKey = cacheKey,
+            Tables = tables,
+            RowCount = rowCount,
+            SizeBytes = sizeBytes,
+            Ttl = ttl,
+            Duration = duration,
+            Exception = exception
+        });
     }
 
     #endregion

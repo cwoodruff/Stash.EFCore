@@ -1,3 +1,5 @@
+using Stash.EFCore.Diagnostics;
+
 namespace Stash.EFCore.Configuration;
 
 /// <summary>
@@ -59,4 +61,17 @@ public class StashOptions
     /// Named caching profiles for per-query configuration.
     /// </summary>
     public Dictionary<string, StashProfile> Profiles { get; set; } = new();
+
+    /// <summary>
+    /// Optional callback invoked on every cache event (hit, miss, invalidation, error, etc.).
+    /// Use for custom telemetry, metrics, or alerting.
+    /// </summary>
+    public Action<StashEvent>? OnStashEvent { get; set; }
+
+    /// <summary>
+    /// Minimum cache hit rate (0-100) for the health check to report Healthy.
+    /// Below this threshold, the health check reports Degraded.
+    /// Default is 10%.
+    /// </summary>
+    public double MinimumHitRatePercent { get; set; } = 10.0;
 }

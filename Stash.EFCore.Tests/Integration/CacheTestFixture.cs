@@ -186,7 +186,7 @@ internal sealed class CacheTestFixture : IDisposable
         CommandInterceptor = new StashCommandInterceptor(
             CacheStore, keyGen, Options, NullLogger<StashCommandInterceptor>.Instance);
         InvalidationInterceptor = new StashInvalidationInterceptor(
-            CacheStore, NullLogger<StashInvalidationInterceptor>.Instance);
+            CacheStore, NullLogger<StashInvalidationInterceptor>.Instance, Options);
         SqlCounter = new SqlCountingInterceptor();
 
         _contextOptions = new DbContextOptionsBuilder<IntegrationDbContext>()

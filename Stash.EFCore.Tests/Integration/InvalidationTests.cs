@@ -164,7 +164,7 @@ public class InvalidationTests : IDisposable
 
         // Manually invalidate
         var invalidator = new StashInvalidator(
-            _f.CacheStore, NullLogger<StashInvalidator>.Instance);
+            _f.CacheStore, NullLogger<StashInvalidator>.Instance, _f.Options);
         await invalidator.InvalidateTablesAsync(["products"]);
 
         // Next query should hit DB

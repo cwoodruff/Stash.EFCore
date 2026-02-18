@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Stash.EFCore.Caching;
+using Stash.EFCore.Configuration;
+using Stash.EFCore.Diagnostics;
 using Stash.EFCore.Logging;
 
 namespace Stash.EFCore.Interceptors;
@@ -18,6 +20,8 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
 {
     private readonly ICacheStore _cacheStore;
     private readonly ILogger<StashInvalidationInterceptor> _logger;
+    private readonly StashOptions _options;
+    private readonly StashStatistics? _statistics;
 
     /// <summary>
     /// Stores table names captured before save, keyed by DbContext instance.
@@ -27,10 +31,14 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
 
     public StashInvalidationInterceptor(
         ICacheStore cacheStore,
-        ILogger<StashInvalidationInterceptor> logger)
+        ILogger<StashInvalidationInterceptor> logger,
+        StashOptions options,
+        IStashStatistics? statistics = null)
     {
         _cacheStore = cacheStore;
         _logger = logger;
+        _options = options;
+        _statistics = statistics as StashStatistics;
     }
 
     #region Sync overrides
@@ -114,9 +122,16 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
         {
             PendingInvalidations.Remove(context);
 
-            _logger.LogDebug(StashEventIds.CacheInvalidation,
+            _statistics?.RecordInvalidation(tableNames);
+            _logger.LogDebug(StashEventIds.CacheInvalidated,
                 "Invalidating cache for tables: [{Tables}]",
                 string.Join(", ", tableNames));
+
+            _options.OnStashEvent?.Invoke(new StashEvent
+            {
+                EventType = StashEventType.CacheInvalidated,
+                Tables = tableNames
+            });
 
             await _cacheStore.InvalidateByTagsAsync(tableNames, cancellationToken);
         }

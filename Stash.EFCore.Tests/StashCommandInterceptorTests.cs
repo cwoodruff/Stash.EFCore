@@ -63,7 +63,7 @@ public class StashCommandInterceptorTests : IDisposable
         var logger = NullLogger<StashCommandInterceptor>.Instance;
         _interceptor = new StashCommandInterceptor(_cacheStore, keyGen, _options, logger);
         _invalidationInterceptor = new StashInvalidationInterceptor(
-            _cacheStore, NullLogger<StashInvalidationInterceptor>.Instance);
+            _cacheStore, NullLogger<StashInvalidationInterceptor>.Instance, _options);
 
         var contextOptions = new DbContextOptionsBuilder<TestDbContext>()
             .UseSqlite(_connection)
