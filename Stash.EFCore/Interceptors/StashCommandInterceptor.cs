@@ -57,6 +57,7 @@ public class StashCommandInterceptor : DbCommandInterceptor
 
     #region Reader interception — async
 
+    /// <inheritdoc />
     public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
         DbCommand command,
         CommandEventData eventData,
@@ -98,6 +99,7 @@ public class StashCommandInterceptor : DbCommandInterceptor
         return result;
     }
 
+    /// <inheritdoc />
     public override async ValueTask<DbDataReader> ReaderExecutedAsync(
         DbCommand command,
         CommandExecutedEventData eventData,
@@ -126,6 +128,7 @@ public class StashCommandInterceptor : DbCommandInterceptor
 
     #region Reader interception — sync
 
+    /// <inheritdoc />
     public override InterceptionResult<DbDataReader> ReaderExecuting(
         DbCommand command,
         CommandEventData eventData,
@@ -166,6 +169,7 @@ public class StashCommandInterceptor : DbCommandInterceptor
         return result;
     }
 
+    /// <inheritdoc />
     public override DbDataReader ReaderExecuted(
         DbCommand command,
         CommandExecutedEventData eventData,
@@ -192,6 +196,7 @@ public class StashCommandInterceptor : DbCommandInterceptor
 
     #region Scalar interception — async
 
+    /// <inheritdoc />
     public override async ValueTask<InterceptionResult<object>> ScalarExecutingAsync(
         DbCommand command,
         CommandEventData eventData,
@@ -234,6 +239,7 @@ public class StashCommandInterceptor : DbCommandInterceptor
         return result;
     }
 
+    /// <inheritdoc />
     public override async ValueTask<object?> ScalarExecutedAsync(
         DbCommand command,
         CommandExecutedEventData eventData,
@@ -273,6 +279,7 @@ public class StashCommandInterceptor : DbCommandInterceptor
 
     #region Scalar interception — sync
 
+    /// <inheritdoc />
     public override InterceptionResult<object> ScalarExecuting(
         DbCommand command,
         CommandEventData eventData,
@@ -314,6 +321,7 @@ public class StashCommandInterceptor : DbCommandInterceptor
         return result;
     }
 
+    /// <inheritdoc />
     public override object? ScalarExecuted(
         DbCommand command,
         CommandExecutedEventData eventData,

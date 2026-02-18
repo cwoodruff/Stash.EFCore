@@ -15,12 +15,22 @@ public class StashStatistics : IStashStatistics
     private long _totalBytesCached;
     private readonly ConcurrentDictionary<string, long> _invalidationsByTable = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <inheritdoc />
     public long Hits => Interlocked.Read(ref _hits);
+
+    /// <inheritdoc />
     public long Misses => Interlocked.Read(ref _misses);
+
+    /// <inheritdoc />
     public long Invalidations => Interlocked.Read(ref _invalidations);
+
+    /// <inheritdoc />
     public long Errors => Interlocked.Read(ref _errors);
+
+    /// <inheritdoc />
     public long Skips => Interlocked.Read(ref _skips);
 
+    /// <inheritdoc />
     public double HitRate
     {
         get
@@ -30,8 +40,10 @@ public class StashStatistics : IStashStatistics
         }
     }
 
+    /// <inheritdoc />
     public long TotalBytesCached => Interlocked.Read(ref _totalBytesCached);
 
+    /// <inheritdoc />
     public IReadOnlyDictionary<string, long> InvalidationsByTable =>
         _invalidationsByTable;
 
@@ -72,6 +84,7 @@ public class StashStatistics : IStashStatistics
         Interlocked.Add(ref _totalBytesCached, -bytes);
     }
 
+    /// <inheritdoc />
     public void Reset()
     {
         Interlocked.Exchange(ref _hits, 0);
