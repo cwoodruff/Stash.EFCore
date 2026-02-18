@@ -486,3 +486,4 @@ http-client.private.env.json
 /.claude
 /.idea
 CLAUDE.md
+.DS_Store
