@@ -23,6 +23,11 @@ public interface ICacheStore
     Task InvalidateByTagsAsync(IEnumerable<string> tags, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Invalidates a single cache entry by its exact key.
+    /// </summary>
+    Task InvalidateKeyAsync(string key, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Invalidates all cache entries regardless of tags.
     /// </summary>
     Task InvalidateAllAsync(CancellationToken cancellationToken = default);

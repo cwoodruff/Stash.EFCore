@@ -123,6 +123,13 @@ public class MemoryCacheStore : ICacheStore
         }
     }
 
+    public Task InvalidateKeyAsync(string key, CancellationToken cancellationToken = default)
+    {
+        _cache.Remove(key);
+        TryRemoveKeyFromTagIndex(key);
+        return Task.CompletedTask;
+    }
+
     public Task InvalidateAllAsync(CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _version);

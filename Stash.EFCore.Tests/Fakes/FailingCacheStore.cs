@@ -18,6 +18,9 @@ internal sealed class FailingCacheStore : ICacheStore
     public Task InvalidateByTagsAsync(IEnumerable<string> tags, CancellationToken cancellationToken = default) =>
         throw new InvalidOperationException("Cache unavailable");
 
+    public Task InvalidateKeyAsync(string key, CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException("Cache unavailable");
+
     public Task InvalidateAllAsync(CancellationToken cancellationToken = default) =>
         throw new InvalidOperationException("Cache unavailable");
 }

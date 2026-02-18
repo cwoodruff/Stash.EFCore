@@ -68,6 +68,12 @@ public class HybridCacheStore : ICacheStore
         }
     }
 
+    public async Task InvalidateKeyAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var versionedKey = VersionedKey(key);
+        await _cache.RemoveAsync(versionedKey, cancellationToken);
+    }
+
     public Task InvalidateAllAsync(CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _version);

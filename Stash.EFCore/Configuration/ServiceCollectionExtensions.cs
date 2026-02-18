@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<ICacheStore, MemoryCacheStore>();
         services.AddSingleton<StashCommandInterceptor>();
         services.AddSingleton<StashInvalidationInterceptor>();
+        services.TryAddSingleton<IStashInvalidator, StashInvalidator>();
 
         return services;
     }
@@ -41,6 +42,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<ICacheStore, HybridCacheStore>();
         services.AddSingleton<StashCommandInterceptor>();
         services.AddSingleton<StashInvalidationInterceptor>();
+        services.TryAddSingleton<IStashInvalidator, StashInvalidator>();
 
         return services;
     }

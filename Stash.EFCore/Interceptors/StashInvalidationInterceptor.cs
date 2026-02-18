@@ -12,6 +12,7 @@ namespace Stash.EFCore.Interceptors;
 /// whose table dependencies overlap with the modified entity types.
 /// Table names are captured in SavingChanges (before save, while entries still have
 /// their pre-save states) and invalidation occurs in SavedChanges (after save succeeds).
+/// On failure, captured table names are discarded without invalidation.
 /// </summary>
 public class StashInvalidationInterceptor : SaveChangesInterceptor
 {
@@ -20,6 +21,7 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
 
     /// <summary>
     /// Stores table names captured before save, keyed by DbContext instance.
+    /// Using ConditionalWeakTable so entries are auto-cleaned when the DbContext is GC'd.
     /// </summary>
     private static readonly ConditionalWeakTable<DbContext, List<string>> PendingInvalidations = new();
 
@@ -31,6 +33,8 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
         _logger = logger;
     }
 
+    #region Sync overrides
+
     public override InterceptionResult<int> SavingChanges(
         DbContextEventData eventData,
         InterceptionResult<int> result)
@@ -39,6 +43,24 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
         return result;
     }
 
+    public override int SavedChanges(
+        SaveChangesCompletedEventData eventData,
+        int result)
+    {
+        InvalidateCapturedTables(eventData.Context).GetAwaiter().GetResult();
+        return result;
+    }
+
+    public override void SaveChangesFailed(
+        DbContextErrorEventData eventData)
+    {
+        DiscardCapturedTables(eventData.Context);
+    }
+
+    #endregion
+
+    #region Async overrides
+
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData,
         InterceptionResult<int> result,
@@ -46,14 +68,6 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
     {
         CaptureChangedTables(eventData.Context);
         return ValueTask.FromResult(result);
-    }
-
-    public override int SavedChanges(
-        SaveChangesCompletedEventData eventData,
-        int result)
-    {
-        InvalidateCapturedTables(eventData.Context).GetAwaiter().GetResult();
-        return result;
     }
 
     public override async ValueTask<int> SavedChangesAsync(
@@ -65,6 +79,16 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
         return result;
     }
 
+    public override Task SaveChangesFailedAsync(
+        DbContextErrorEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        DiscardCapturedTables(eventData.Context);
+        return Task.CompletedTask;
+    }
+
+    #endregion
+
     private static void CaptureChangedTables(DbContext? context)
     {
         if (context is null)
@@ -73,6 +97,12 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
         var tableNames = GetChangedTableNames(context);
         if (tableNames.Count > 0)
             PendingInvalidations.AddOrUpdate(context, tableNames);
+    }
+
+    private static void DiscardCapturedTables(DbContext? context)
+    {
+        if (context is not null)
+            PendingInvalidations.Remove(context);
     }
 
     private async Task InvalidateCapturedTables(DbContext? context, CancellationToken cancellationToken = default)
@@ -92,7 +122,12 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
         }
     }
 
-    private static List<string> GetChangedTableNames(DbContext context)
+    /// <summary>
+    /// Extracts the set of table names affected by tracked entity changes.
+    /// Navigates owned entities to include their table names as well.
+    /// All table names are lowercased for consistent tag matching.
+    /// </summary>
+    internal static List<string> GetChangedTableNames(DbContext context)
     {
         var tableNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -101,10 +136,23 @@ public class StashInvalidationInterceptor : SaveChangesInterceptor
             if (entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
             {
                 var entityType = context.Model.FindEntityType(entry.Entity.GetType());
-                var tableName = entityType?.GetTableName();
+                if (entityType is null)
+                    continue;
 
+                var tableName = entityType.GetTableName();
                 if (tableName is not null)
-                    tableNames.Add(tableName);
+                    tableNames.Add(tableName.ToLowerInvariant());
+
+                // Include tables for owned entity navigations
+                foreach (var navigation in entityType.GetNavigations())
+                {
+                    if (navigation.TargetEntityType.IsOwned())
+                    {
+                        var ownedTableName = navigation.TargetEntityType.GetTableName();
+                        if (ownedTableName is not null)
+                            tableNames.Add(ownedTableName.ToLowerInvariant());
+                    }
+                }
             }
         }
 
