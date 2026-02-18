@@ -21,51 +21,46 @@ public static class QueryableExtensions
     internal const string NoCacheTag = "Stash:NoCache";
 
     /// <summary>
-    /// Marks this query to be cached using default expiration settings.
+    /// Marks this query for caching with default expiration settings.
     /// </summary>
-    public static IQueryable<T> Stash<T>(this IQueryable<T> source)
+    public static IQueryable<T> Cached<T>(this IQueryable<T> query)
     {
-        return source.TagWith(FormatTag(0, 0, null));
+        return query.TagWith("Stash:TTL=0");
     }
 
     /// <summary>
-    /// Marks this query to be cached with a specific absolute expiration.
+    /// Marks this query for caching with the specified absolute TTL.
     /// </summary>
-    public static IQueryable<T> Stash<T>(this IQueryable<T> source, TimeSpan absoluteExpiration)
+    public static IQueryable<T> Cached<T>(this IQueryable<T> query, TimeSpan absoluteExpiration)
     {
-        return source.TagWith(FormatTag((int)absoluteExpiration.TotalSeconds, 0, null));
+        var seconds = (int)absoluteExpiration.TotalSeconds;
+        return query.TagWith($"Stash:TTL={seconds}");
     }
 
     /// <summary>
-    /// Marks this query to be cached with specific absolute and sliding expirations.
+    /// Marks this query for caching with absolute and sliding expiration.
     /// </summary>
-    public static IQueryable<T> Stash<T>(this IQueryable<T> source,
+    public static IQueryable<T> Cached<T>(this IQueryable<T> query,
         TimeSpan absoluteExpiration, TimeSpan slidingExpiration)
     {
-        return source.TagWith(FormatTag(
-            (int)absoluteExpiration.TotalSeconds,
-            (int)slidingExpiration.TotalSeconds,
-            null));
+        var ttl = (int)absoluteExpiration.TotalSeconds;
+        var sliding = (int)slidingExpiration.TotalSeconds;
+        return query.TagWith($"Stash:TTL={ttl},Sliding={sliding}");
     }
 
     /// <summary>
-    /// Marks this query to be cached using a named profile.
+    /// Marks this query for caching with a named cache profile.
     /// </summary>
-    public static IQueryable<T> Stash<T>(this IQueryable<T> source, string profileName)
+    public static IQueryable<T> Cached<T>(this IQueryable<T> query, string profileName)
     {
-        return source.TagWith(FormatTag(0, 0, profileName));
+        return query.TagWith($"Stash:Profile={profileName}");
     }
 
     /// <summary>
-    /// Marks this query to NOT be cached, even when <c>CacheAllQueries</c> is enabled.
+    /// Marks this query to NOT be cached (useful when CacheAllQueries is true).
     /// </summary>
-    public static IQueryable<T> StashNoCache<T>(this IQueryable<T> source)
+    public static IQueryable<T> NoStash<T>(this IQueryable<T> query)
     {
-        return source.TagWith(NoCacheTag);
-    }
-
-    private static string FormatTag(int ttlSeconds, int slidingSeconds, string? profileName)
-    {
-        return $"Stash:TTL={ttlSeconds},Sliding={slidingSeconds},Profile={profileName}";
+        return query.TagWith(NoCacheTag);
     }
 }

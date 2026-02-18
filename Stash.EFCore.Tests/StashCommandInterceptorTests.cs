@@ -114,12 +114,12 @@ public class StashCommandInterceptorTests : IDisposable
     {
         SeedProducts("Gadget");
 
-        var result1 = await _context.Products.Stash().ToListAsync();
+        var result1 = await _context.Products.Cached().ToListAsync();
         result1.Should().HaveCount(1);
 
         await _context.Database.ExecuteSqlRawAsync("DELETE FROM Products");
 
-        var result2 = await _context.Products.Stash().ToListAsync();
+        var result2 = await _context.Products.Cached().ToListAsync();
         result2.Should().HaveCount(1, "result should come from cache");
         result2[0].Name.Should().Be("Gadget");
     }
@@ -165,7 +165,7 @@ public class StashCommandInterceptorTests : IDisposable
         context.ChangeTracker.Clear();
 
         // Query with 5-second TTL
-        var result1 = await context.Products.Stash(TimeSpan.FromSeconds(5)).ToListAsync();
+        var result1 = await context.Products.Cached(TimeSpan.FromSeconds(5)).ToListAsync();
         result1.Should().HaveCount(1);
 
         // Advance clock past TTL
@@ -175,7 +175,7 @@ public class StashCommandInterceptorTests : IDisposable
         await context.Database.ExecuteSqlRawAsync("DELETE FROM Products");
 
         // Cache should have expired — query hits empty DB
-        var result2 = await context.Products.Stash(TimeSpan.FromSeconds(5)).ToListAsync();
+        var result2 = await context.Products.Cached(TimeSpan.FromSeconds(5)).ToListAsync();
         result2.Should().BeEmpty("cache entry should have expired after 10 seconds");
     }
 
@@ -190,7 +190,7 @@ public class StashCommandInterceptorTests : IDisposable
         SeedProducts("Profiled");
 
         // First query with profile
-        var result1 = await _context.Products.Stash("fast-expire").ToListAsync();
+        var result1 = await _context.Products.Cached("fast-expire").ToListAsync();
         result1.Should().HaveCount(1);
 
         // Small delay to ensure TTL expires (MemoryCache checks on access)
@@ -199,7 +199,7 @@ public class StashCommandInterceptorTests : IDisposable
         await _context.Database.ExecuteSqlRawAsync("DELETE FROM Products");
 
         // Cache should have expired
-        var result2 = await _context.Products.Stash("fast-expire").ToListAsync();
+        var result2 = await _context.Products.Cached("fast-expire").ToListAsync();
         result2.Should().BeEmpty("profile TTL should have expired");
     }
 
@@ -219,7 +219,7 @@ public class StashCommandInterceptorTests : IDisposable
         await _context.Database.ExecuteSqlRawAsync("DELETE FROM Products");
 
         var result2 = await _context.Products.ToListAsync();
-        result2.Should().HaveCount(1, "CacheAllQueries should cache even without .Stash()");
+        result2.Should().HaveCount(1, "CacheAllQueries should cache even without .Cached()");
     }
 
     #endregion
@@ -247,14 +247,14 @@ public class StashCommandInterceptorTests : IDisposable
         _options.ExcludedTables.Add("Products");
         SeedProducts("ForceCached");
 
-        // Explicit .Stash() should override ExcludedTables
-        var result1 = await _context.Products.Stash().ToListAsync();
+        // Explicit .Cached() should override ExcludedTables
+        var result1 = await _context.Products.Cached().ToListAsync();
         result1.Should().HaveCount(1);
 
         await _context.Database.ExecuteSqlRawAsync("DELETE FROM Products");
 
-        var result2 = await _context.Products.Stash().ToListAsync();
-        result2.Should().HaveCount(1, "explicit .Stash() should override ExcludedTables");
+        var result2 = await _context.Products.Cached().ToListAsync();
+        result2.Should().HaveCount(1, "explicit .Cached() should override ExcludedTables");
     }
 
     [Fact]
@@ -433,12 +433,12 @@ public class StashCommandInterceptorTests : IDisposable
         SeedProducts("NoCacheMe");
 
         // Query with NoCache — should not be cached
-        var result1 = await _context.Products.StashNoCache().ToListAsync();
+        var result1 = await _context.Products.NoStash().ToListAsync();
         result1.Should().HaveCount(1);
 
         await _context.Database.ExecuteSqlRawAsync("DELETE FROM Products");
 
-        var result2 = await _context.Products.StashNoCache().ToListAsync();
+        var result2 = await _context.Products.NoStash().ToListAsync();
         result2.Should().BeEmpty("StashNoCache should prevent caching");
     }
 
@@ -534,7 +534,7 @@ public class StashCommandInterceptorTests : IDisposable
     [Fact]
     public void ShouldCache_SelectWithStashTag_ReturnsTrue()
     {
-        var command = new FakeDbCommand("-- Stash:TTL=0,Sliding=0,Profile=\nSELECT * FROM Products");
+        var command = new FakeDbCommand("-- Stash:TTL=0\nSELECT * FROM Products");
         _interceptor.ShouldCache(command, hasResult: false).Should().BeTrue();
     }
 
@@ -622,7 +622,7 @@ public class StashCommandInterceptorTests : IDisposable
     [Fact]
     public void ResolveTtl_WithInlineTtl_ParsesCorrectly()
     {
-        var command = new FakeDbCommand("-- Stash:TTL=60,Sliding=10,Profile=\nSELECT 1");
+        var command = new FakeDbCommand("-- Stash:TTL=60,Sliding=10\nSELECT 1");
         var (abs, sliding) = _interceptor.ResolveTtl(command);
         abs.Should().Be(TimeSpan.FromSeconds(60));
         sliding.Should().Be(TimeSpan.FromSeconds(10));
@@ -631,7 +631,7 @@ public class StashCommandInterceptorTests : IDisposable
     [Fact]
     public void ResolveTtl_WithZeroTtl_ReturnsDefaults()
     {
-        var command = new FakeDbCommand("-- Stash:TTL=0,Sliding=0,Profile=\nSELECT 1");
+        var command = new FakeDbCommand("-- Stash:TTL=0\nSELECT 1");
         var (abs, sliding) = _interceptor.ResolveTtl(command);
         abs.Should().Be(_options.DefaultAbsoluteExpiration);
         sliding.Should().Be(_options.DefaultSlidingExpiration);
@@ -647,7 +647,7 @@ public class StashCommandInterceptorTests : IDisposable
             SlidingExpiration = TimeSpan.FromSeconds(2)
         };
 
-        var command = new FakeDbCommand("-- Stash:TTL=0,Sliding=0,Profile=hot\nSELECT 1");
+        var command = new FakeDbCommand("-- Stash:Profile=hot\nSELECT 1");
         var (abs, sliding) = _interceptor.ResolveTtl(command);
         abs.Should().Be(TimeSpan.FromSeconds(5));
         sliding.Should().Be(TimeSpan.FromSeconds(2));

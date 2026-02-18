@@ -21,14 +21,14 @@ public class StashOptions
     public string KeyPrefix { get; set; } = "stash:";
 
     /// <summary>
-    /// When true, all SELECT queries are cached automatically without requiring <c>.Stash()</c>.
+    /// When true, all SELECT queries are cached automatically without requiring <c>.Cached()</c>.
     /// Queries targeting tables in <see cref="ExcludedTables"/> are still excluded.
     /// </summary>
     public bool CacheAllQueries { get; set; }
 
     /// <summary>
     /// Table names that should never be cached when <see cref="CacheAllQueries"/> is true.
-    /// Has no effect on queries explicitly tagged with <c>.Stash()</c>.
+    /// Has no effect on queries explicitly tagged with <c>.Cached()</c>.
     /// </summary>
     public HashSet<string> ExcludedTables { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 

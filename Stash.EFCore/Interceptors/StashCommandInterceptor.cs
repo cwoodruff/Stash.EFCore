@@ -1,5 +1,4 @@
 using System.Data.Common;
-using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
@@ -307,7 +306,7 @@ public class StashCommandInterceptor : DbCommandInterceptor
         var sql = command.CommandText;
 
         // Explicit NoCache tag
-        if (sql.Contains(QueryableExtensions.StashTagPrefix + "NoCache", StringComparison.Ordinal))
+        if (StashTagParser.IsExplicitlyNotCached(sql))
             return false;
 
         // Non-SELECT command (defensive check — ReaderExecuting is normally only called for SELECTs)
@@ -315,7 +314,7 @@ public class StashCommandInterceptor : DbCommandInterceptor
             return false;
 
         // Explicit Stash tag (opt-in always works, regardless of CacheAllQueries)
-        if (HasStashTag(sql))
+        if (StashTagParser.IsCacheable(sql))
             return true;
 
         // CacheAllQueries mode
@@ -332,15 +331,6 @@ public class StashCommandInterceptor : DbCommandInterceptor
         }
 
         return false;
-    }
-
-    /// <summary>
-    /// Checks if the SQL has a Stash tag (but not NoCache).
-    /// </summary>
-    private static bool HasStashTag(string sql)
-    {
-        // Look for "-- Stash:TTL=" which indicates a real caching tag vs "-- Stash:NoCache"
-        return sql.Contains(QueryableExtensions.StashTagPrefix + "TTL=", StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -382,13 +372,10 @@ public class StashCommandInterceptor : DbCommandInterceptor
     /// </summary>
     internal (TimeSpan absoluteTtl, TimeSpan? slidingTtl) ResolveTtl(DbCommand command)
     {
-        var tagLine = ExtractStashTagLine(command.CommandText);
-        if (tagLine is null)
-            return (_options.DefaultAbsoluteExpiration, _options.DefaultSlidingExpiration);
+        var (absoluteTtl, slidingTtl, profileName) = StashTagParser.ParseCacheTag(command.CommandText);
 
-        // Check for named profile first
-        var profileName = ExtractTagValue(tagLine, "Profile");
-        if (!string.IsNullOrEmpty(profileName) &&
+        // Check for named profile
+        if (profileName is not null &&
             _options.Profiles.TryGetValue(profileName, out var profile))
         {
             return (
@@ -397,55 +384,10 @@ public class StashCommandInterceptor : DbCommandInterceptor
             );
         }
 
-        // Parse inline TTL
-        var absoluteTtl = _options.DefaultAbsoluteExpiration;
-        var slidingTtl = _options.DefaultSlidingExpiration;
-
-        if (TryParseTagInt(tagLine, "TTL", out var ttlSeconds) && ttlSeconds > 0)
-            absoluteTtl = TimeSpan.FromSeconds(ttlSeconds);
-
-        if (TryParseTagInt(tagLine, "Sliding", out var slidingSeconds) && slidingSeconds > 0)
-            slidingTtl = TimeSpan.FromSeconds(slidingSeconds);
-
-        return (absoluteTtl, slidingTtl);
-    }
-
-    /// <summary>
-    /// Extracts the Stash tag line from SQL (e.g., "TTL=1800,Sliding=600,Profile=hot-data").
-    /// </summary>
-    private static string? ExtractStashTagLine(string sql)
-    {
-        const string prefix = "-- Stash:TTL=";
-        var idx = sql.IndexOf(prefix, StringComparison.Ordinal);
-        if (idx < 0)
-            return null;
-
-        // Start after "-- Stash:" prefix
-        var start = idx + "-- Stash:".Length;
-        var end = sql.IndexOf('\n', start);
-        return end < 0 ? sql[start..] : sql[start..end];
-    }
-
-    private static string? ExtractTagValue(string tagLine, string key)
-    {
-        var prefix = key + "=";
-        var idx = tagLine.IndexOf(prefix, StringComparison.Ordinal);
-        if (idx < 0)
-            return null;
-
-        var start = idx + prefix.Length;
-        var end = tagLine.IndexOf(',', start);
-        return end < 0 ? tagLine[start..].Trim() : tagLine[start..end].Trim();
-    }
-
-    private static bool TryParseTagInt(string tagLine, string key, out int value)
-    {
-        var str = ExtractTagValue(tagLine, key);
-        if (str is not null)
-            return int.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
-
-        value = 0;
-        return false;
+        return (
+            absoluteTtl ?? _options.DefaultAbsoluteExpiration,
+            slidingTtl ?? _options.DefaultSlidingExpiration
+        );
     }
 
     #endregion

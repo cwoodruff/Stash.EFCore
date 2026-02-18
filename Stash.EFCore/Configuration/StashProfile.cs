@@ -6,7 +6,7 @@ namespace Stash.EFCore.Configuration;
 public class StashProfile
 {
     /// <summary>
-    /// The unique name of this profile, used with .Stash("profileName").
+    /// The unique name of this profile, used with .Cached("profileName").
     /// </summary>
     public required string Name { get; set; }
 

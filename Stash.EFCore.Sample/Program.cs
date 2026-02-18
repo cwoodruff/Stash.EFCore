@@ -31,11 +31,11 @@ using (var scope = app.Services.CreateScope())
     db.Database.EnsureCreated();
 }
 
-// GET /products — cached query using .Stash()
+// GET /products — cached query using .Cached()
 app.MapGet("/products", async (SampleDbContext db) =>
     await db.Products
         .Include(p => p.Category)
-        .Stash(TimeSpan.FromMinutes(5))
+        .Cached(TimeSpan.FromMinutes(5))
         .ToListAsync());
 
 // GET /products/{id} — single product, cached
@@ -43,7 +43,7 @@ app.MapGet("/products/{id:int}", async (int id, SampleDbContext db) =>
     await db.Products
         .Include(p => p.Category)
         .Where(p => p.Id == id)
-        .Stash()
+        .Cached()
         .FirstOrDefaultAsync()
     is { } product
         ? Results.Ok(product)
