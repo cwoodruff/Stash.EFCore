@@ -26,15 +26,28 @@ public sealed class CachedDataReader : DbDataReader
         _resultSet = resultSet;
     }
 
+    /// <inheritdoc />
     public override int FieldCount => _resultSet.Columns.Length;
+
+    /// <inheritdoc />
     public override bool HasRows => _resultSet.Rows.Length > 0;
+
+    /// <inheritdoc />
     public override bool IsClosed => _isClosed;
+
+    /// <inheritdoc />
     public override int RecordsAffected => _resultSet.RecordsAffected;
+
+    /// <inheritdoc />
     public override int Depth => 0;
 
+    /// <inheritdoc />
     public override object this[int ordinal] => GetValue(ordinal);
+
+    /// <inheritdoc />
     public override object this[string name] => GetValue(GetOrdinal(name));
 
+    /// <inheritdoc />
     public override bool Read()
     {
         if (_currentRowIndex + 1 < _resultSet.Rows.Length)
@@ -46,22 +59,27 @@ public sealed class CachedDataReader : DbDataReader
         return false;
     }
 
+    /// <inheritdoc />
     public override Task<bool> ReadAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(Read());
     }
 
+    /// <inheritdoc />
     public override bool NextResult() => false;
 
+    /// <inheritdoc />
     public override Task<bool> NextResultAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(false);
     }
 
+    /// <inheritdoc />
     public override string GetName(int ordinal) => _resultSet.Columns[ordinal].Name;
 
+    /// <inheritdoc />
     public override int GetOrdinal(string name)
     {
         var columns = _resultSet.Columns;
@@ -74,14 +92,19 @@ public sealed class CachedDataReader : DbDataReader
         throw new IndexOutOfRangeException($"Column '{name}' not found.");
     }
 
+    /// <inheritdoc />
     public override Type GetFieldType(int ordinal) => _resultSet.Columns[ordinal].FieldType;
+
+    /// <inheritdoc />
     public override string GetDataTypeName(int ordinal) => _resultSet.Columns[ordinal].DataTypeName;
 
+    /// <inheritdoc />
     public override object GetValue(int ordinal)
     {
         return _resultSet.Rows[_currentRowIndex][ordinal] ?? DBNull.Value;
     }
 
+    /// <inheritdoc />
     public override int GetValues(object[] values)
     {
         var row = _resultSet.Rows[_currentRowIndex];
@@ -91,14 +114,17 @@ public sealed class CachedDataReader : DbDataReader
         return count;
     }
 
+    /// <inheritdoc />
     public override bool IsDBNull(int ordinal) => _resultSet.Rows[_currentRowIndex][ordinal] is null;
 
+    /// <inheritdoc />
     public override Task<bool> IsDBNullAsync(int ordinal, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(IsDBNull(ordinal));
     }
 
+    /// <inheritdoc />
     public override T GetFieldValue<T>(int ordinal)
     {
         var value = _resultSet.Rows[_currentRowIndex][ordinal];
@@ -113,25 +139,50 @@ public sealed class CachedDataReader : DbDataReader
         return (T)Convert.ChangeType(value, typeof(T));
     }
 
+    /// <inheritdoc />
     public override Task<T> GetFieldValueAsync<T>(int ordinal, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(GetFieldValue<T>(ordinal));
     }
 
+    /// <inheritdoc />
     public override bool GetBoolean(int ordinal) => GetFieldValue<bool>(ordinal);
+
+    /// <inheritdoc />
     public override byte GetByte(int ordinal) => GetFieldValue<byte>(ordinal);
+
+    /// <inheritdoc />
     public override char GetChar(int ordinal) => GetFieldValue<char>(ordinal);
+
+    /// <inheritdoc />
     public override DateTime GetDateTime(int ordinal) => GetFieldValue<DateTime>(ordinal);
+
+    /// <inheritdoc />
     public override decimal GetDecimal(int ordinal) => GetFieldValue<decimal>(ordinal);
+
+    /// <inheritdoc />
     public override double GetDouble(int ordinal) => GetFieldValue<double>(ordinal);
+
+    /// <inheritdoc />
     public override float GetFloat(int ordinal) => GetFieldValue<float>(ordinal);
+
+    /// <inheritdoc />
     public override Guid GetGuid(int ordinal) => GetFieldValue<Guid>(ordinal);
+
+    /// <inheritdoc />
     public override short GetInt16(int ordinal) => GetFieldValue<short>(ordinal);
+
+    /// <inheritdoc />
     public override int GetInt32(int ordinal) => GetFieldValue<int>(ordinal);
+
+    /// <inheritdoc />
     public override long GetInt64(int ordinal) => GetFieldValue<long>(ordinal);
+
+    /// <inheritdoc />
     public override string GetString(int ordinal) => GetFieldValue<string>(ordinal);
 
+    /// <inheritdoc />
     public override long GetBytes(int ordinal, long dataOffset, byte[]? buffer, int bufferOffset, int length)
     {
         var data = GetFieldValue<byte[]>(ordinal);
@@ -142,6 +193,7 @@ public sealed class CachedDataReader : DbDataReader
         return count;
     }
 
+    /// <inheritdoc />
     public override long GetChars(int ordinal, long dataOffset, char[]? buffer, int bufferOffset, int length)
     {
         var str = GetString(ordinal);
@@ -152,10 +204,13 @@ public sealed class CachedDataReader : DbDataReader
         return count;
     }
 
+    /// <inheritdoc />
     public override IEnumerator GetEnumerator() => new DbEnumerator(this);
 
+    /// <inheritdoc />
     public override void Close() => _isClosed = true;
 
+    /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
         _isClosed = true;
